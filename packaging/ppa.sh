@@ -6,6 +6,9 @@
 #   packaging/ppa.sh 0.1.0                 # build and sign into build/ppa
 #   packaging/ppa.sh 0.1.0 --upload        # ...and dput them
 #   SERIES="noble" packaging/ppa.sh 0.1.0  # only some series
+#   PPA_REV=2 OUT=build/ppa2 packaging/ppa.sh 0.1.0 --upload
+#                                          # the same version again, e.g. for a
+#                                          # newly enabled architecture
 #
 # Needs docker, git, and the signing key in the host's gpg-agent.
 set -eu
@@ -17,7 +20,10 @@ key=${DEBSIGN_KEYID:-7746D1F8D7DA0259!}
 ppa=${PPA:-ppa:mattmoyles/ans2irc}
 maintainer="Matt Moyles <matt@mattmoyles.com>"
 root=$(git rev-parse --show-toplevel)
-out=$root/build/ppa
+out=${OUT:-$root/build/ppa}
+ppa_rev=${PPA_REV:-1}
+# Launchpad already has the orig tarball after the first upload of a version
+[ "$ppa_rev" -gt 1 ] && orig_opt=-sd || orig_opt=-sa
 image=ubuntu:24.04
 
 mkdir -p "$out"
@@ -25,7 +31,7 @@ orig="ans2irc_$version.orig.tar.gz"
 git -C "$root" archive --prefix="ans2irc-$version/" -o "$out/$orig" "v$version"
 
 for s in $series; do
-    rev="$version-1~${s}1"
+    rev="$version-1~${s}${ppa_rev}"
     work="$out/work-$s"
     mkdir -p "$work"
     cp "$out/$orig" "$work/"
@@ -36,10 +42,10 @@ for s in $series; do
             "$rev" "$s" "$version" "$s" "$maintainer" "$(date -R)"
         cat "$root/packaging/debian/changelog"
     } > "$work/ans2irc-$version/debian/changelog"
-    docker run --rm -v "$work:/b" -w "/b/ans2irc-$version" -e UID_GID="$(id -u):$(id -g)" "$image" sh -c '
+    docker run --rm -v "$work:/b" -w "/b/ans2irc-$version" -e UID_GID="$(id -u):$(id -g)" -e ORIG_OPT="$orig_opt" "$image" sh -c '
         apt-get update -qq >/dev/null
         DEBIAN_FRONTEND=noninteractive apt-get install -y -qq dpkg-dev debhelper >/dev/null 2>&1
-        dpkg-buildpackage -S -sa -d -us -uc >/b/build.log 2>&1 || { tail -20 /b/build.log; exit 1; }
+        dpkg-buildpackage -S "$ORIG_OPT" -d -us -uc >/b/build.log 2>&1 || { tail -20 /b/build.log; exit 1; }
         chown -R "$UID_GID" /b'
     mv "$work"/ans2irc_"$rev"* "$out/"
     echo "built $rev"

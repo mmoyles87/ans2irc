@@ -47,7 +47,14 @@ curl -LO https://github.com/mmoyles87/ans2irc/releases/download/v0.1.0/ans2irc_0
 sudo apt install ./ans2irc_0.1.0-1_amd64.deb
 ```
 
-**Fedora, RHEL, openSUSE:**
+**Fedora, RHEL 9 and 10, Alma, Rocky** ([COPR](https://copr.fedorainfracloud.org/coprs/mmoyles87/ans2irc/)):
+
+```sh
+sudo dnf copr enable mmoyles87/ans2irc
+sudo dnf install ans2irc
+```
+
+or any rpm-based distribution, openSUSE included, from the release:
 
 ```sh
 sudo dnf install https://github.com/mmoyles87/ans2irc/releases/download/v0.1.0/ans2irc-0.1.0-1.x86_64.rpm

@@ -21,3 +21,8 @@
    (`curl -sL https://github.com/mmoyles87/ans2irc/archive/refs/tags/vX.Y.Z.tar.gz | sha256sum`),
    then `brew install --build-from-source mmoyles87/tap/ans2irc && brew test ans2irc && brew audit --strict --online mmoyles87/tap/ans2irc`
    on a Mac, commit and push.
+6. COPR: build the source RPM from `packaging/rpm/ans2irc.spec` and the tag
+   tarball (`spectool -g` then `rpmbuild -bs`) and submit it with
+   `copr-cli build mmoyles87/ans2irc ans2irc-X.Y.Z-1.*.src.rpm`. The project
+   builds Fedora 43, 44, 45 and Rawhide and EPEL 9 and 10, on x86_64 and
+   aarch64. `copr-cli` reads its token from `~/.config/copr`.

@@ -1,0 +1,43 @@
+[package]
+name = "ans2irc"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+description = "Convert ANSI art to mIRC-coloured text that fits in IRC messages"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/mmoyles87/ans2irc"
+readme = "README.md"
+exclude = ["/packaging", "/.github", "/assets"]
+keywords = ["ansi", "irc", "mirc", "ascii-art", "cp437"]
+categories = ["command-line-utilities", "encoding"]
+
+[dependencies]
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+[package.metadata.deb]
+maintainer = "Matt Moyles <matt@mattmoyles.com>"
+copyright = "2026, Matt Moyles <matt@mattmoyles.com>"
+section = "utils"
+priority = "optional"
+extended-description = """\
+ans2irc reads ANSI art (CP437 text with escape codes, SAUCE optional) and \
+writes it as UTF-8 text with mIRC colour codes, one IRC message per line, \
+in as few bytes as the picture allows. Given a byte budget, it merges \
+colours until each line fits before it cuts any."""
+assets = [
+    ["target/release/ans2irc", "usr/bin/", "755"],
+    ["doc/ans2irc.1", "usr/share/man/man1/", "644"],
+    ["README.md", "usr/share/doc/ans2irc/", "644"],
+]
+
+[package.metadata.generate-rpm]
+summary = "Convert ANSI art to mIRC-coloured text for IRC"
+assets = [
+    { source = "target/release/ans2irc", dest = "/usr/bin/ans2irc", mode = "755" },
+    { source = "doc/ans2irc.1", dest = "/usr/share/man/man1/ans2irc.1", mode = "644", doc = true },
+    { source = "README.md", dest = "/usr/share/doc/ans2irc/README.md", mode = "644", doc = true },
+    { source = "LICENSE", dest = "/usr/share/licenses/ans2irc/LICENSE", mode = "644", doc = true },
+]

@@ -1,0 +1,96 @@
+.TH ANS2IRC 1 2026-10-16 "ans2irc 0.1.0" "User Commands"
+.SH NAME
+ans2irc \- convert ANSI art to mIRC-coloured text for IRC
+.SH SYNOPSIS
+.B ans2irc
+[\fIoptions\fR] [\fIfile\fR]
+.SH DESCRIPTION
+.B ans2irc
+reads ANSI art (CP437 text with escape codes, with or without a SAUCE record)
+from
+.I file
+or standard input, and writes it as UTF-8 text with mIRC colour codes, one IRC
+message per line, in as few bytes as the picture allows.
+.PP
+Each line is encoded in the fewest bytes that draw it: a space and a full
+block in the same colour are interchangeable, as are a top half block and a
+bottom half block with the colours reversed, and colour numbers take one digit
+wherever the next character can't be read as part of them.
+.PP
+With a byte budget
+.RB ( \-m
+or
+.BR \-f ),
+a line that is still too long has its colours merged, a run of cells at a
+time, until it fits; cells are cut from the right only when the glyphs alone
+don't fit.
+.SH OPTIONS
+.TP
+.BR \-w ", " \-\-width " \fIN\fR"
+Columns. The default is the SAUCE width, else 80.
+.TP
+.BR \-l ", " \-\-crop\-left " \fIN\fR"
+Drop
+.I N
+columns from the left.
+.TP
+.BR \-r ", " \-\-crop\-right " \fIN\fR"
+Drop
+.I N
+columns from the right.
+.TP
+.BR \-t ", " \-\-tab\-size " \fIN\fR"
+Tab stops every
+.I N
+columns. The default is 8.
+.TP
+.BR \-m ", " \-\-max\-bytes " \fIN\fR"
+Fit every line in
+.I N
+bytes.
+.TP
+.BR \-f ", " \-\-for " \fIMASK TARGET\fR"
+Fit every line in a message from
+.I MASK
+(nick!user@host) to
+.I TARGET
+(a channel or nick), as the people receiving it see it: 512 bytes less the
+prefix the server adds.
+.TP
+.BR \-\-ice ", " \-\-no\-ice
+Treat blink as a bright background, or as blink. The default is the SAUCE
+flag, else
+.BR \-\-ice .
+.TP
+.BR \-s ", " \-\-swap\-shades
+Let the encoder swap \[u2591] for \[u2593] with the colours reversed, and
+\[u2592] either way round. The dither patterns differ slightly.
+.TP
+.BR \-n ", " \-\-no\-colour
+Plain text.
+.TP
+.BR \-v ", " \-\-verbose
+Report the number of lines, the longest line and any recolouring on standard
+error.
+.TP
+.BR \-h ", " \-\-help
+Show the options.
+.TP
+.BR \-V ", " \-\-version
+Show the version.
+.SH EXIT STATUS
+0 on success, 1 when the input can't be read, 2 for a bad option.
+.SH EXAMPLES
+Convert a piece:
+.PP
+.RS
+.B ans2irc art.ans > art.txt
+.RE
+.PP
+Fit every line for messages from nick!user@host to #art:
+.PP
+.RS
+.B ans2irc \-f 'nick!user@host' '#art' art.ans
+.RE
+.SH SEE ALSO
+https://github.com/mmoyles87/ans2irc

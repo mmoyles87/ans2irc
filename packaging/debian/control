@@ -1,0 +1,21 @@
+Source: ans2irc
+Section: utils
+Priority: optional
+Maintainer: Matt Moyles <matt@mattmoyles.com>
+Build-Depends: debhelper-compat (= 13), cargo, rustc (>= 1.70)
+Standards-Version: 4.6.2
+Homepage: https://github.com/mmoyles87/ans2irc
+Vcs-Browser: https://github.com/mmoyles87/ans2irc
+Vcs-Git: https://github.com/mmoyles87/ans2irc.git
+Rules-Requires-Root: no
+
+Package: ans2irc
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: convert ANSI art to mIRC-coloured text for IRC
+ ans2irc reads ANSI art (CP437 text with escape codes, SAUCE optional) and
+ writes it as UTF-8 text with mIRC colour codes, one IRC message per line,
+ in as few bytes as the picture allows.
+ .
+ Given a byte budget, it merges colours until each line fits before it
+ cuts any.

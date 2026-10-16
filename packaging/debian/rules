@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	cargo build --release --offline --locked
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	cargo test --release --offline --locked
+endif
+
+override_dh_auto_install:
+	install -Dm755 target/release/ans2irc debian/ans2irc/usr/bin/ans2irc
+
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home

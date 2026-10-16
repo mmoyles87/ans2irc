@@ -1,0 +1,51 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: rustup target add ${{ matrix.target }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb,cargo-generate-rpm
+      - run: cargo test --locked
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME#v}"
+          name="ans2irc-$version-${{ matrix.target }}"
+          mkdir -p "dist" "$name"
+          cp "target/${{ matrix.target }}/release/ans2irc" doc/ans2irc.1 LICENSE README.md "$name/"
+          tar czf "dist/$name.tar.gz" "$name"
+          cargo deb --no-build --target ${{ matrix.target }} --output dist/
+          cargo generate-rpm --target ${{ matrix.target }} --output dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/*
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: cd dist && sha256sum * > SHA256SUMS
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "ans2irc ${GITHUB_REF_NAME#v}" --generate-notes

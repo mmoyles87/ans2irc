@@ -40,7 +40,14 @@ or a binary for Apple silicon (`aarch64-apple-darwin`) or Intel
 (`x86_64-apple-darwin`) from the
 [releases page](https://github.com/mmoyles87/ans2irc/releases).
 
-**Debian, Ubuntu and derivatives:**
+**Ubuntu** 22.04, 24.04, 26.04 and 26.10 ([PPA](https://launchpad.net/~mattmoyles/+archive/ubuntu/ans2irc)):
+
+```sh
+sudo add-apt-repository ppa:mattmoyles/ans2irc
+sudo apt install ans2irc
+```
+
+**Debian and other Debian-based distributions:**
 
 ```sh
 curl -LO https://github.com/mmoyles87/ans2irc/releases/download/v0.1.0/ans2irc_0.1.0-1_amd64.deb

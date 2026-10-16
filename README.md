@@ -30,6 +30,16 @@ yay -S ans2irc        # or: paru -S ans2irc
 yay -S ans2irc-bin
 ```
 
+**macOS** (Homebrew):
+
+```sh
+brew install mmoyles87/tap/ans2irc
+```
+
+or a binary for Apple silicon (`aarch64-apple-darwin`) or Intel
+(`x86_64-apple-darwin`) from the
+[releases page](https://github.com/mmoyles87/ans2irc/releases).
+
 **Debian, Ubuntu and derivatives:**
 
 ```sh

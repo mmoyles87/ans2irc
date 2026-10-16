@@ -1,0 +1,48 @@
+name: macos
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: release tag to add macOS builds to
+        required: true
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - run: cargo test --locked
+      - name: Build and package
+        run: |
+          set -eu
+          version="${TAG#v}"
+          mkdir -p dist
+          for target in aarch64-apple-darwin x86_64-apple-darwin; do
+            cargo build --release --locked --target "$target"
+            name="ans2irc-$version-$target"
+            mkdir -p "$name"
+            cp "target/$target/release/ans2irc" doc/ans2irc.1 LICENSE README.md "$name/"
+            tar czf "dist/$name.tar.gz" "$name"
+          done
+      - name: Add to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          # the Linux workflow creates the release; wait for it
+          for i in $(seq 1 60); do gh release view "$TAG" >/dev/null 2>&1 && break; sleep 20; done
+          gh release upload "$TAG" dist/*.tar.gz --clobber
+          # add the new files to SHA256SUMS
+          for i in $(seq 1 30); do gh release download "$TAG" -p SHA256SUMS -D sums --clobber 2>/dev/null && break; sleep 20; done
+          grep -v -- '-apple-darwin\.tar\.gz$' sums/SHA256SUMS > sums/new || true
+          (cd dist && shasum -a 256 *.tar.gz) >> sums/new
+          mv sums/new sums/SHA256SUMS
+          gh release upload "$TAG" sums/SHA256SUMS --clobber

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Build Ubuntu source packages of a release tag for the PPA, one per series,
-# sign them with the host's gpg-agent and, with --upload, send them to
-# Launchpad. Everything Debian-specific runs in an ubuntu container.
+# sign them with the host's gpg and, with --upload, send them to
+# Launchpad. The Debian tooling runs in an ubuntu container.
 #
 #   packaging/ppa.sh 0.1.0                 # build and sign into build/ppa
 #   packaging/ppa.sh 0.1.0 --upload        # ...and dput them
@@ -13,8 +13,8 @@ set -eu
 version=${1:?usage: ppa.sh VERSION [--upload]}
 upload=${2:-}
 series=${SERIES:-"jammy noble resolute stonking"}
-key=${DEBSIGN_KEYID:-7746D1F8D7DA0259}
-ppa=${PPA:-ppa:mmoyles87/ans2irc}
+key=${DEBSIGN_KEYID:-7746D1F8D7DA0259!}
+ppa=${PPA:-ppa:mattmoyles/ans2irc}
 maintainer="Matt Moyles <matt@mattmoyles.com>"
 root=$(git rev-parse --show-toplevel)
 out=$root/build/ppa
@@ -45,25 +45,17 @@ for s in $series; do
     echo "built $rev"
 done
 
-# sign in a container that talks to the host's gpg-agent through its extra
-# socket: the private key never leaves the host
-agent=$(gpgconf --list-dirs agent-extra-socket)
-keys=$(mktemp -d)
-gpg --export "$key" > "$keys/key.gpg"
-docker run --rm -v "$out:/out" -v "$keys:/keys:ro" -v "$agent:/tmp/agent" \
-    -e KEY="$key" -e UID_GID="$(id -u):$(id -g)" "$image" sh -c '
-    apt-get update -qq >/dev/null
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq devscripts gnupg dput >/dev/null 2>&1
-    export GNUPGHOME=/tmp/gnupg && mkdir -m 700 $GNUPGHOME
-    gpg -q --import /keys/key.gpg && ln -s /tmp/agent $GNUPGHOME/S.gpg-agent
-    echo "no-autostart" > $GNUPGHOME/gpg.conf
-    cd /out && debsign -k"$KEY" --re-sign *_source.changes
-    chown -R "$UID_GID" /out'
-rm -r "$keys"
+# sign on the host, where gpg-agent holds the key
+"$root/packaging/sign-changes.py" "$key" "$out"/*_source.changes
 
 if [ "$upload" = "--upload" ]; then
-    docker run --rm -v "$out:/out" "$image" sh -c '
+    # dput checks the signatures before it sends anything
+    keys=$(mktemp -d)
+    gpg --export "${key%!}" > "$keys/key.gpg"
+    docker run --rm -v "$out:/out" -v "$keys:/keys:ro" "$image" sh -c '
         apt-get update -qq >/dev/null
-        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq dput >/dev/null 2>&1
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq dput gnupg >/dev/null 2>&1
+        gpg -q --import /keys/key.gpg 2>/dev/null
         cd /out && for c in *_source.changes; do dput '"$ppa"' "$c"; done'
+    rm -r "$keys"
 fi

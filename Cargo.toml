@@ -18,8 +18,8 @@ lto = true
 codegen-units = 1
 
 [package.metadata.deb]
-maintainer = "Matt Moyles <matt@mattmoyles.com>"
-copyright = "2026, Matt Moyles <matt@mattmoyles.com>"
+maintainer = "Matt Moyles <matt@moyles.xyz>"
+copyright = "2026, Matt Moyles <matt@moyles.xyz>"
 section = "utils"
 priority = "optional"
 extended-description = """\

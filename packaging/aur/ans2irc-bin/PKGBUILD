@@ -1,4 +1,4 @@
-# Maintainer: Matt Moyles <matt@mattmoyles.com>
+# Maintainer: Matt Moyles <matt@moyles.xyz>
 pkgname=ans2irc-bin
 _name=ans2irc
 pkgver=0.1.0

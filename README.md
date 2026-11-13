@@ -157,7 +157,12 @@ fit, as with 120-column pieces under a 360-byte budget.
 
 ## ANSI support
 
-CP437 text, with the control range drawn as DOS drew it; SGR colours,
+CP437 text, with the control range drawn as DOS drew it, or UTF-8 text: a file
+whose drawing has bytes above 0x7f and is valid UTF-8 throughout (a byte order
+mark is allowed) is read a character to a glyph, so curly quotes and emoji come
+through as themselves, and an emoji or other wide character takes two columns
+for cursor moves, line width and wrapping. Block art in CP437 is practically
+never valid UTF-8, and plain ASCII reads the same either way. SGR colours,
 including bright (`90–97`, `100–107`), xterm 256-colour and 24-bit colour
 (mapped to the nearest of mIRC's 99), and PabloDraw's 24-bit `t` sequences;
 cursor movement, save and restore, erase in line and clear screen; tabs; SAUCE

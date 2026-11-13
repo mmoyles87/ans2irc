@@ -1,9 +1,20 @@
-//! Draw an ANSI file (CP437 text with escape codes) onto a grid of cells.
+//! Draw an ANSI file (CP437 or UTF-8 text with escape codes) onto a grid of
+//! cells.
+//!
+//! A file whose drawing has bytes above 0x7f and is valid UTF-8 throughout is
+//! read as UTF-8: each character is one glyph, and a wide one (emoji, CJK)
+//! takes two columns. Anything else is CP437, byte by byte. CP437 block art
+//! is practically never valid UTF-8, and plain ASCII reads the same either way.
 
 use crate::cp437;
 use crate::palette::{nearest, xterm_rgb, ANSI_BRIGHT, ANSI_NORMAL};
 use crate::sauce;
+use crate::wide::wide;
 use crate::Cell;
+
+/// The column a wide glyph covers, after the cell that holds it. Never
+/// output: a NUL byte draws as a space, so no file puts this in a cell.
+const COVERED: char = '\0';
 
 /// A broken file's cursor jumps must not make the canvas eat memory.
 pub const MAX_ROWS: usize = 5000;
@@ -76,7 +87,14 @@ impl Canvas {
     }
 
     fn put(&mut self, ch: char) {
-        if self.pen.wrap {
+        self.put_wide(ch, false);
+    }
+
+    /// Put a glyph; a wide one also covers the next column, and goes to the
+    /// next row when only one column is left, as a terminal draws it.
+    fn put_wide(&mut self, ch: char, two: bool) {
+        let two = two && self.width >= 2;
+        if self.pen.wrap || (two && self.pen.col == self.width - 1) {
             self.pen.row += 1;
             self.pen.col = 0;
             self.pen.wrap = false;
@@ -89,6 +107,10 @@ impl Canvas {
         }
         let (fg, bg) = self.colours();
         self.rows[self.pen.row][self.pen.col] = Some(Cell { ch, fg, bg });
+        if two {
+            self.pen.col += 1;
+            self.rows[self.pen.row][self.pen.col] = Some(Cell { ch: COVERED, fg, bg });
+        }
         if self.pen.col == self.width - 1 {
             self.pen.wrap = true;
         } else {
@@ -236,10 +258,55 @@ impl Canvas {
     }
 }
 
+/// Whether a drawing (SAUCE already removed) is UTF-8 text, and where its
+/// text starts: past a byte order mark if it has one.
+fn utf8_text(data: &[u8]) -> Option<usize> {
+    if !data.iter().any(|&b| b >= 0x80) || std::str::from_utf8(data).is_err() {
+        return None;
+    }
+    Some(if data.starts_with("\u{feff}".as_bytes()) { 3 } else { 0 })
+}
+
+/// The character UTF-8 `data` starts with and its length in bytes, or None
+/// where a character can't start (an escape sequence ate the front of one).
+fn utf8_char(data: &[u8]) -> Option<(char, usize)> {
+    let len = match data[0] {
+        0xc0..=0xdf => 2,
+        0xe0..=0xef => 3,
+        0xf0..=0xf7 => 4,
+        _ => return None,
+    };
+    let s = std::str::from_utf8(data.get(..len)?).ok()?;
+    Some((s.chars().next()?, len))
+}
+
+/// A row of a UTF-8 drawing with the columns wide glyphs cover taken out. A
+/// glyph drawn over half of a wide one blanks the other half, as on a
+/// terminal, and so does a crop through one.
+fn settle(cells: Vec<Cell>) -> Vec<Cell> {
+    let mut out: Vec<Cell> = Vec::with_capacity(cells.len());
+    for (i, &cell) in cells.iter().enumerate() {
+        if cell.ch == COVERED {
+            if !out.last().is_some_and(|c| wide(c.ch)) {
+                out.push(Cell { ch: ' ', ..cell });
+            }
+            continue;
+        }
+        let mut cell = cell;
+        if wide(cell.ch) && cells.get(i + 1).map_or(true, |c| c.ch != COVERED) {
+            cell.ch = ' ';
+        }
+        out.push(cell);
+    }
+    out
+}
+
 /// Draw `data` and return its rows, with the trailing black spaces of each
 /// row and the blank rows above and below the art dropped.
 pub fn render(data: &[u8], opts: &Options) -> Vec<Vec<Cell>> {
     let (data, sauce) = sauce::split(data);
+    let utf8 = utf8_text(data);
+    let data = &data[utf8.unwrap_or(0)..];
     let width = opts
         .width
         .or(sauce.width)
@@ -308,6 +375,12 @@ pub fn render(data: &[u8], opts: &Options) -> Vec<Vec<Cell>> {
                 c.pen.wrap = false;
             }
             0x00 => c.put(' '),
+            0x80..=0xff if utf8.is_some() => {
+                if let Some((ch, len)) = utf8_char(&data[i - 1..]) {
+                    c.put_wide(ch, wide(ch));
+                    i += len - 1;
+                }
+            }
             _ => c.put(cp437::glyph(b)),
         }
     }
@@ -319,6 +392,9 @@ pub fn render(data: &[u8], opts: &Options) -> Vec<Vec<Cell>> {
         .into_iter()
         .map(|row| {
             let mut cells: Vec<Cell> = row[start..end].iter().map(|c| c.unwrap_or(DEFAULT)).collect();
+            if utf8.is_some() {
+                cells = settle(cells);
+            }
             // trailing black space is invisible on the black background art assumes
             while cells.last().is_some_and(|c| c.ch == ' ' && c.bg == ANSI_NORMAL[0]) {
                 cells.pop();

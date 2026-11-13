@@ -5,8 +5,11 @@
 //! picture least for each byte it saves goes first, and so on until the line
 //! fits. Only if that runs out are cells cut from the right.
 
+use std::collections::HashSet;
+
 use crate::encode::{encode, encoded_len, Options};
 use crate::palette::distance;
+use crate::wide::wide;
 use crate::Cell;
 
 #[derive(Debug, Default, PartialEq)]
@@ -40,6 +43,12 @@ fn shown(cell: &Cell) -> (u8, u8) {
     }
 }
 
+/// What makes cells one run: the colours they show, and whether they are
+/// wide, since a wide glyph keeps its foreground where a space drops it.
+fn look(cell: &Cell) -> ((u8, u8), bool) {
+    (shown(cell), wide(cell.ch))
+}
+
 fn change(cell: &Cell, fg: u8, bg: u8) -> f64 {
     let k = ink(cell.ch);
     k * distance(cell.fg, fg) + (1.0 - k) * distance(cell.bg, bg)
@@ -51,14 +60,26 @@ struct Merge {
     count: usize,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum Pick {
+    /// The least loss for each byte saved.
+    Saving,
+    /// The least change of any, saving or not.
+    Forced,
+    /// The least change that makes a run look like its neighbour, so there
+    /// is one run fewer: forced picks that went round in a circle.
+    Joining,
+}
+
 /// The recolouring of one run to a neighbour's colours that loses the least
-/// for each byte it saves. With `forced`, the least change of any, saving or
-/// not, so a line that no single merge shortens still gets somewhere.
-fn best_merge(cells: &[Cell], size: usize, opts: &Options, forced: bool) -> Option<Merge> {
+/// for each byte it saves. A forced pick takes the least change of any, so a
+/// line that no single merge shortens still gets somewhere.
+fn best_merge(cells: &[Cell], size: usize, opts: &Options, pick: Pick) -> Option<Merge> {
+    let forced = pick != Pick::Saving;
     let mut runs = Vec::new();
     let mut start = 0;
     for i in 1..=cells.len() {
-        if i == cells.len() || shown(&cells[i]) != shown(&cells[start]) {
+        if i == cells.len() || look(&cells[i]) != look(&cells[start]) {
             runs.push(start..i);
             start = i;
         }
@@ -84,10 +105,18 @@ fn best_merge(cells: &[Cell], size: usize, opts: &Options, forced: bool) -> Opti
                 }
                 let mut trial = cells.to_vec();
                 let mut cost = 0.0;
+                let mut seen = false;
                 for c in &mut trial[run.clone()] {
                     cost += change(c, fg, bg);
+                    let was = shown(c);
                     c.fg = fg;
                     c.bg = bg;
+                    seen |= shown(c) != was;
+                }
+                // a merge nobody would see changes nothing, and a forced one
+                // would be picked again and again
+                if !seen || (pick == Pick::Joining && look(&trial[run.start]) != look(&cells[at])) {
+                    continue;
                 }
                 let saved = size.saturating_sub(encoded_len(&trial, opts));
                 if saved == 0 && !forced {
@@ -118,10 +147,22 @@ pub fn fit(cells: &[Cell], budget: usize, opts: &Options) -> Fitted {
     }
     let mut cells = cells.to_vec();
     let mut recoloured = 0;
+    // picks depend only on how the cells look, so a look seen before would
+    // come round again for ever
+    let mut looks = HashSet::new();
+    let mut forced = Pick::Forced;
     while size > budget {
-        let Some(m) = best_merge(&cells, size, opts, false).or_else(|| best_merge(&cells, size, opts, true)) else {
+        let Some(m) = best_merge(&cells, size, opts, Pick::Saving).or_else(|| best_merge(&cells, size, opts, forced))
+        else {
             break;
         };
+        if !looks.insert(m.cells.iter().map(shown).collect::<Vec<_>>()) {
+            if forced == Pick::Joining {
+                break;
+            }
+            forced = Pick::Joining;
+            continue;
+        }
         cells = m.cells;
         recoloured += m.count;
         size = encoded_len(&cells, opts);
@@ -177,6 +218,27 @@ mod tests {
         assert!(f.line.len() <= full - 20);
         assert!(f.recoloured > 0);
         assert_eq!(f.cut, 0);
+    }
+
+    #[test]
+    fn emoji_beside_spaces_still_fits() {
+        let mut row = Vec::new();
+        for i in 0..20u8 {
+            row.push(Cell {
+                ch: '😂',
+                fg: 4 + i % 3,
+                bg: 1 + i % 2,
+            });
+            row.push(Cell {
+                ch: ' ',
+                fg: 7,
+                bg: 2 + i % 2,
+            });
+        }
+        for budget in (0..=encode(&row, &Options::default()).len()).step_by(7) {
+            let f = fit(&row, budget, &Options::default());
+            assert!(f.line.len() <= budget);
+        }
     }
 
     #[test]

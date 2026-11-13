@@ -6,8 +6,9 @@ use ans2irc::{ansi, budget_for, encode, fit};
 const USAGE: &str = "\
 usage: ans2irc [options] [file]
 
-Convert ANSI art (CP437 with escape codes, SAUCE optional) to mIRC-coloured
-UTF-8, one IRC message per line. Reads standard input without a file.
+Convert ANSI art (CP437 or UTF-8 with escape codes, SAUCE optional) to
+mIRC-coloured UTF-8, one IRC message per line. Reads standard input without a
+file.
 
   -w, --width N           columns (default: the SAUCE width, else 80)
   -l, --crop-left N       drop N columns from the left

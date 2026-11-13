@@ -8,6 +8,7 @@ pub mod encode;
 pub mod fit;
 pub mod palette;
 pub mod sauce;
+pub mod wide;
 
 /// One character cell: a glyph and its mIRC foreground and background.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

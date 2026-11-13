@@ -6,11 +6,16 @@ ans2irc \- convert ANSI art to mIRC-coloured text for IRC
 [\fIoptions\fR] [\fIfile\fR]
 .SH DESCRIPTION
 .B ans2irc
-reads ANSI art (CP437 text with escape codes, with or without a SAUCE record)
-from
+reads ANSI art (CP437 or UTF-8 text with escape codes, with or without a SAUCE
+record) from
 .I file
 or standard input, and writes it as UTF-8 text with mIRC colour codes, one IRC
 message per line, in as few bytes as the picture allows.
+.PP
+A file whose drawing has bytes above 0x7f and is valid UTF-8 throughout (a
+byte order mark is allowed) is read as UTF-8, a character to a glyph; an emoji
+or other East Asian wide character takes two columns. Anything else is CP437,
+with the control range drawn as DOS drew it.
 .PP
 Each line is encoded in the fewest bytes that draw it: a space and a full
 block in the same colour are interchangeable, as are a top half block and a

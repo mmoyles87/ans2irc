@@ -8,6 +8,7 @@
 //! fewest bytes. Colour numbers are written with one digit wherever the next
 //! character can't be read as part of the number.
 
+use crate::wide::wide;
 use crate::Cell;
 
 /// Colours the client is drawing with; None is its own default.
@@ -61,7 +62,9 @@ fn ways(cell: &Cell, opts: &Options) -> ([Way; 2], usize) {
     if blank(cell.ch) {
         return solid(b);
     }
-    if cell.ch == '█' || f == b {
+    // an emoji or other wide glyph shows whatever its colours, and a solid
+    // cell would be one column narrower
+    if cell.ch == '█' || (f == b && !wide(cell.ch)) {
         return solid(f);
     }
     let pair = |a: char, z: char| {
@@ -357,6 +360,12 @@ mod tests {
         let row = cells(&[('a', 4, 1), (',', 9, 1)]);
         let line = encode(&row, &Options::default());
         same_look(&row, &line);
+    }
+
+    #[test]
+    fn wide_glyph_is_never_solid() {
+        let row = cells(&[('😂', 4, 4)]);
+        assert_eq!(encode(&row, &Options::default()), "\x034,4😂");
     }
 
     #[test]
